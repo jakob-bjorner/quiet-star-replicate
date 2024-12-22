@@ -6,3 +6,4 @@ jupyter
 ipython
 accelerate
 wandb
+matplotlib

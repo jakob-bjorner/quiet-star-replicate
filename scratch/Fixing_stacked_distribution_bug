@@ -1,0 +1,114 @@
+BUG:
+When you have the distribution parameters on the hidden represenation in the main stream without a mixing head, there is a kind of exploading gradients problem, where the model eventually gets to nan weights for whatever reason.
+
+What is the derivative of the distribution?
+
+$$\log(\frac{1}{\sigma\sqrt{2\pi}} \exp(-\frac{(x - \mu)^2}{2\sigma^2}))$$
+
+$$-\log(\sigma\sqrt{2\pi}) - \frac{(x - \mu)^2}{2\sigma^2}$$
+
+$$\nabla_\mu = \frac{x - \mu}{\sigma^2}$$
+
+$$\nabla_\sigma = -\frac{1}{\sigma} + \frac{(x - \mu)^2}{\sigma^3}$$
+
+So the $\nabla_\sigma$ term scales with the cube of the sigma parameter, so maybe if we check the min of the sigma, we might see if this value just keeps going to low and that causes some issue. The second term here says for the log prob of some x to increase, we should decrease the sigma if this x is within sigma of our mean essentially if explaining this example is easier with a smaller sigma or a larger one. perfect sigma is when mean minus x is exactly sigma. then your variance is perfect. My bet is that the variance is encouraged to increase, so looking at distributional parameter min and maxes over time should expload? (changing min max range for clamp fixed it 0.1 to 10 std and -10 to 10 mean. I am still unsure why 1e-4 and 1e4 and ranges of std weren't stable? There is no back prop through time, so no traditionally exploading gradients, but, and 1e-4 is no where near nan?? neither is 1e-12 or really anything...? What causes the std to shoot down so fast in the first place?)
+
+Also, we have the gradient setup to just be based on the single token performance, and we use the REINFORCE policy gradient.
+
+$$\nabla_\pi = \mathbb{E}_{h \sim \pi{(h | x)}}[\nabla_\pi \log(\pi(h | x)) r(h, x)]$$
+
+In our case the R is the reduction in nll, but to simplify it for debugging we can just make it always 1, so if we try to maximize this quantity we are doing maximum likelihood on every point.
+
+Right now, I am trying to isolate the issue of nan weights in a very simple setting. Just removing the restriction of min and max, and seeing if explosion happens with just simple reward 1. Doesn't. Now trying to find where it happens in real setting without snipping the variance or mean.
+
+
+
+
+quiet_star_policy_loss= -0.0924408957362175
+nll_loss= 2.398932695388794
+avg_std= 0.4149656891822815
+dist std min max: 0.0832899734377861 0.4149656891822815 15.815366744995117
+hidden_states min max: -16.59408187866211 20.23694610595703
+hidden_state minus mean squared max: 334.2447814941406
+hidden_state minus mean divided by std max: 5.16657829284668
+log_prob min max: -103.70149230957031 1.5428820848464966
+loss   119: 2.3065   grad norm: 0.1585          model param norm: 84.3496        
+
+quiet_star_policy_loss= -0.10377445071935654
+nll_loss= 2.3827579021453857
+avg_std= 0.4050038754940033
+dist std min max: 0.08362748473882675 0.4050038754940033 10.90499496459961
+hidden_states min max: -14.241265296936035 17.851449966430664
+hidden_state minus mean squared max: 315.18182373046875
+hidden_state minus mean divided by std max: 5.16657829284668
+log_prob min max: -13.870681762695312 1.5224918127059937
+loss   120: 2.2790   grad norm: 0.1563          model param norm: 84.3625        
+
+quiet_star_policy_loss= -0.09355904906988144
+nll_loss= 2.3833601474761963
+avg_std= 0.40316084027290344
+dist std min max: 0.08394468575716019 0.40316084027290344 7.812618255615234
+hidden_states min max: -17.912803649902344 15.062662124633789
+hidden_state minus mean squared max: 245.92510986328125
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -103.28388214111328 1.5485097169876099
+loss   121: 2.2898   grad norm: 0.1558          model param norm: 84.3755        
+
+quiet_star_policy_loss= -0.10453005135059357
+nll_loss= 2.3979640007019043
+avg_std= 0.4007833003997803
+dist std min max: 0.058477070182561874 0.4007833003997803 14.848167419433594
+hidden_states min max: -16.225969314575195 18.627880096435547
+hidden_state minus mean squared max: 395.665283203125
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -103.93588256835938 1.5578798055648804
+loss   122: 2.2934   grad norm: 0.1692          model param norm: 84.3885        
+
+quiet_star_policy_loss= -0.09790670871734619
+nll_loss= 2.3941783905029297
+avg_std= 0.4039347171783447
+dist std min max: 0.054389867931604385 0.4039347171783447 11.215758323669434
+hidden_states min max: -31.11623764038086 18.33986473083496
+hidden_state minus mean squared max: 1025.3681640625
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -104.20354461669922 1.925460696220398
+loss   123: 2.2963   grad norm: 0.1657          model param norm: 84.4014        
+
+quiet_star_policy_loss= -0.10332617908716202
+nll_loss= 2.379417657852173
+avg_std= 0.39638450741767883
+dist std min max: 0.02165912836790085 0.39638450741767883 15.953654289245605
+hidden_states min max: -20.23720932006836 16.519073486328125
+hidden_state minus mean squared max: 419.0231628417969
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -104.55154418945312 2.452284812927246
+loss   124: 2.2761   grad norm: 0.1596          model param norm: 84.4142        
+
+quiet_star_policy_loss= -0.09524594992399216
+nll_loss= 2.3661141395568848
+avg_std= 0.39273303747177124
+dist std min max: 0.07743889093399048 0.39273303747177124 11.310928344726562
+hidden_states min max: -14.685750007629395 11.524018287658691
+hidden_state minus mean squared max: 200.47760009765625
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -103.41886901855469 1.6343296766281128
+loss   125: 2.2709   grad norm: 0.1548          model param norm: 84.4270        
+
+quiet_star_policy_loss= -0.10363443940877914
+nll_loss= 2.361131429672241
+avg_std= 0.3970984220504761
+dist std min max: 0.07665061950683594 0.3970984220504761 9.934901237487793
+hidden_states min max: -12.295714378356934 15.007901191711426
+hidden_state minus mean squared max: 181.50257873535156
+hidden_state minus mean divided by std max: 5.1665778160095215
+log_prob min max: -103.08067321777344 1.6267486810684204
+loss   126: 2.2575   grad norm: 0.1695          model param norm: 84.4397 
+
+
+
+Seems to be something in the variance, where over many sequence examples, the variance of one example compounds when it is large to the next sample, and just keeps getting larger, and the first thing to fail is the zero. Actually, sometimes it can be both inf var and 0 var, so the first thing to fail isn't always just the zero.
+Sometimes a large gradient is experienced before the crash. Doesn't seem consistent.
+p h_t_dists[-1].scale.min(), h_t_dists[-1].scale.max()
+very odd, on h_t_dist[-2] for this one crash example, there is a single instance where the scale was massive. Like 2.98e11.
+
+Ohhh!!! BUG FOUND!! if you take the exp of a tensor, and then clamp it this is no good. The exp will send the value to inf, and you will backprop nan instead of 0!... 

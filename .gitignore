@@ -1,3 +1,6 @@
 quiet_star_replicate_runs/
+quiet_star_replicate_runs
+wandb
+*.pkl
 .env
 *.egg-info

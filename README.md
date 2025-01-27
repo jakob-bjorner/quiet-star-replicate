@@ -82,19 +82,29 @@ $$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h \sim \pi(h | x)}} [\log \
 
 Hence the objective of matching $\frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x)) = \pi(h | x)$ which is somewhat accomplished by the placket luce model of preferences. (We can ensure that confident (as in an ensemble agree) reward distributions are matched ensuring that we always have s which we want to match (typically s is 2 in DPO))
 
-$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)} }{\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}}]$$
+$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)} }{\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}}]$$
 
 Although $\bar r_\psi(h, x)$ depends on $\pi(h | x)$, we are ignoring this during our derivative computation of the above objective (no good justification for this yet). When we do this, we don't need to explicitly compute the any of the terms in the first denominator of the fraction in the log, as they come out as constants, which just depend on which h_i we sample, which can be from the $\pi(h | x)$ or from some prior distirbution.
 
-$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s \frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)}] \\ + \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}}[\sum_i^s\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))} \log\frac{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}]$$
+$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s \frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)}] \\ + \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}}[\sum_i^s\frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))} \log\frac{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}]$$
 
 The ignoring of where the samples come from is very questionable as iterative DPO relies on the very same sampling problem, which has proven to be more than trivial. 
 
 $\color{red}\text{Need to think about how samples for h are derived from optimal distribution at some point}$
 
-$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s \frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_i^j\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)}]$$
+$$\argmax_{\pi} \mathbb{E}_{\substack{x \sim D(x) \\ h_1,h_2,...,h_s \sim \frac{1}{Z(x)}\exp(\frac{1}{\beta_2}\bar r_\psi(h, x))}} [\sum_i^s \frac{\exp(\frac{1}{\beta_2}\bar r_\psi(h_i, x))}{\sum_j^s\exp(\frac{1}{\beta_2}\bar r_\psi(h_j, x))}\log \frac{\pi(h_i | x)}{\sum_j^s\pi(h_j | x)}]$$
 
 Also, the assumption that the same probability mass is always in h 1 to s isn't valid because we don't directly sample from the optimal policy, so we have no idea how much mass is in each of those terms. would want some estimation of Z(x), which is possible to achieve... I think. using a reference policy for h it may be easier because we know the distirbution to sample from, and then just get simple random samples to estimate the expected exponential reward which is what Z is. And once we have Z, the problem is actually way easier because we have a probability mass to match, and we can do this via MSE on the log policy plus the beta weighted log Z which should equal the expected reward for that z, h pair.
 
 
 the h 1 through s are technically sampled from whatever distribution I choose like pi or normal distirbution, and not at all from the optimal distribution, which isn't so good, but I don't know what to do about it...
+
+
+<!-- ## Alpha zero with DPO like Agent-Q? -->
+reward model surrogate:
+$$\bar r_\psi(h, x) \approx \mathbb{E}_{y \sim D(y | x)}[\log\pi(y | h)]$$
+
+$$\tilde{\bar r_\psi}(h, x) = \mathbb{E}_{y \sim \text{LM}(y | x)}[\log\frac{\pi(y | h)}{\text{LM}(y | x)}]$$
+
+
+where LM serves as a proxy for the true distribution over next tokens.

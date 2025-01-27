@@ -1,0 +1,1 @@
+from quiet_star_replicate.trainer.trainer import LatentRationaleTrainer

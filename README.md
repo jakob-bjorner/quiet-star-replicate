@@ -108,3 +108,85 @@ $$\tilde{\bar r_\psi}(h, x) = \mathbb{E}_{y \sim \text{LM}(y | x)}[\log\frac{\pi
 
 
 where LM serves as a proxy for the true distribution over next tokens.
+
+# Quiet Star objective differentiation
+$$L(D) = \mathbb{E}_{x,y\sim D}[\mathbb{E}_{z\sim p_\theta(z | x)}[\log{\frac{1}{p_\theta(y | z, x)}}]]$$
+$$\nabla_\theta L(D) = \nabla_\theta \mathbb{E}_{x,y\sim D}[\mathbb{E}_{z\sim p_\theta(z | x)}[\log{\frac{1}{p_\theta(y | z, x)}}]]$$
+$$ =  \mathbb{E}_{x,y\sim D}[\sum_z[\nabla_\theta (p_\theta(z | x)\log{\frac{1}{p_\theta(y | z, x)}})]]$$
+Apply product rule: ($\frac{\partial}{\partial x}(f(x) * g(x)) = \frac{\partial}{\partial x}f(x) * g(x)+  f(x) * \frac{\partial}{\partial x}g(x)$)
+$$ =  \mathbb{E}_{x,y\sim D}[\sum_z[ \nabla_\theta p_\theta(z | x)\log{\frac{1}{p_\theta(y | z, x)}} + p_\theta(z | x) \nabla_\theta \log{\frac{1}{p_\theta(y | z, x)}}]]$$
+$$ =  \mathbb{E}_{x,y\sim D}[\sum_z[ p_\theta(z | x)\nabla_\theta \log{p_\theta(z | x)}\log{\frac{1}{p_\theta(y | z, x)}} + p_\theta(z | x) \nabla_\theta \log{\frac{1}{p_\theta(y | z, x)}}]]$$
+$$ =  \mathbb{E}_{x,y\sim D}[\mathbb{E}_{z\sim p_\theta(z | x)}[ \nabla_\theta \log{p_\theta(z | x)}\log{\frac{1}{p_\theta(y | z, x)}} + \nabla_\theta \log{\frac{1}{p_\theta(y | z, x)}}]]$$
+# Questioning the utility of rational
+
+Here, I test whether there is an interpreter hidden dimension where the performance of the reasoning model alone beats that of the reasoner + interpreter combo due to ingoring on the part of the interpreter so as to cause the reasoner not to train. 
+
+Maybe also I should make the reasoner interpreter part like huge? like 1000 so it has a higher ceiling, then it will be clear when it is ignored.
+
+// main experiment base lm capacity vs performance with reasoning
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig base_lm_hidden_dim=2,4,8,16,32,64 seed=7,8,9 hydra.launcher.partition='kargo-lab'
+
+// this for seeing if there is some base model capacity which ignores the use of a high capacity reasoning model. TODO: add gradient accumulation to support this test without having to change the effective batch size so as to not change variables.
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig base_lm_hidden_dim=2,4,8,16,32,64 seed=7 reasoner_hidden_dim=1000
+
+// this for determining reasoning performance on it's own
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig seed=7,8,9
+
+python run.py -m +run_modifier=InterpreterGRURunConfig base_lm_hidden_dim=2,4,8,16,32,64 seed=7 hydra.launcher.partition='kargo-lab'
+
+salloc --qos debug -p kargo-lab --cpus-per-gpu=6 -G, --gpus-per-node=a40:1 --exclude="voltron,sonny,kitt,samantha,major,crushinator,nestor,megabot,uniblab,gundam,consu,brainiac,heistotron,deebot,conroy,robby,qt-1,omgwth,puma"
+
+# seeing if capacity can reduce negative transfer when reasoner and interpreter share weights.
+
+python run.py -m +run_modifier=QuietSTaRDiscreteRunConfig model_hidden_dim=2,4,8,16,32,64,128,256,512 seed=7,8
+
+python run.py -m +run_modifier=QuietSTaRDiscreteRunConfig model_hidden_dim=2,4,8,16,32,64,128,256,512 seed=7,8 use_reasoner=False
+
+python run.py -m +run_modifier=QuietSTaRDiscreteRunConfig model_hidden_dim=2048 seed=7 use_reasoner=True,False
+
+- seems to be no by just increasing GRU hidden dimension
+
+python run.py -m+run_modifier=QuietSTaRDiscreteRunConfig seed=7,8 debug_cfg="seperateInterpreter" info="seperateInterpreterDEBUG_"
+
+# seeing if model learning rate on policy loss is holding back the policy learning
+python run.py -m +run_modifier=QuietSTaRDiscreteRunConfig policy_loss_beta=10,100,1000,10000 use_base_lm=True,False
+- training just seems to be more unstable. curious why quiet-star would have thought of doing this? I can only understand this improving their method through the benefits of over tuning.
+
+
+# making changes to allow for the independant testing of combinations of different parts of the network in the GRU setting.
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True,False
+
+// ensure a performance gap still favors rationale as sanity check: it did, but definitely worth it to do this easy thing first because I ran into some tough details.
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True base_lm_hidden_dim=32,64 use_reasoner=True
+// use reasoner = False efficient implementation This faster implementation is just harder to work with because of the way it is logged, but to fix the way it is logged would be mentally a struggle right now, so I will just run the slow implementation, so the logging is nice?
+python run.py -m +run_modifier=InterpreterGRURunConfig simple_lm_head=True base_lm_hidden_dim=32,64,100 seed=7,8,9
+
+TODO: Something weird with projection. from just lm, adding a two teired projection system was beneficial to performance somehow. Even with no non linearity. This is something Kartik has told me about before but I don't recall... 
+
+
+
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True 
+weight_groups=
+['A','A','A','A'],
+['A','A','A','B'],['A','A','B','A'],['A','B','A','A'],['B','A','A','A'],
+['A','A','B','B'],['A','B','A','B'],['A','B','B','A'],
+['A','A','B','C'],['A','B','A','C'],['A','B','C','A'],['B','A','A','C'],['B','A','C','A'],['B','C','A','A']
+['A','B','C','D']
+
+['A','A','B','A'] share_lm_head=True
+
+base_lm_hidden_dim=32 reasoner_hidden_dim=32 interpreter_hidden_dim=32
+base_lm_hidden_dim=64 reasoner_hidden_dim=64 interpreter_hidden_dim=64
+base_lm_hidden_dim=100 reasoner_hidden_dim=100 interpreter_hidden_dim=100
+
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'] base_lm_hidden_dim=32 reasoner_hidden_dim=32 interpreter_hidden_dim=32 share_lm_head=True seed=7,8,9 use_reasoner=True,False
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'] base_lm_hidden_dim=64 reasoner_hidden_dim=64 interpreter_hidden_dim=64 share_lm_head=True seed=7,8,9 use_reasoner=True,False
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'] base_lm_hidden_dim=100 reasoner_hidden_dim=100 interpreter_hidden_dim=100 share_lm_head=True seed=7,8,9 use_reasoner=True,False
+
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'],['A','A','A','B'],['A','A','B','A'],['A','B','A','A'],['B','A','A','A'],['A','A','B','B'],['A','B','A','B'],['A','B','B','A'],['A','A','B','C'],['A','B','A','C'],['A','B','C','A'],['B','A','A','C'],['B','A','C','A'],['B','C','A','A'],['A','B','C','D'] base_lm_hidden_dim=32 reasoner_hidden_dim=32 interpreter_hidden_dim=32 share_lm_head=True seed=8
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'],['A','A','A','B'],['A','A','B','A'],['A','B','A','A'],['B','A','A','A'],['A','A','B','B'],['A','B','A','B'],['A','B','B','A'],['A','A','B','C'],['A','B','A','C'],['A','B','C','A'],['B','A','A','C'],['B','A','C','A'],['B','C','A','A'],['A','B','C','D'] base_lm_hidden_dim=64 reasoner_hidden_dim=64 interpreter_hidden_dim=64 share_lm_head=True seed=7,8
+python run.py -m +run_modifier=ReasonerInterpreterGRURunConfig simple_lm_head=True weight_groups=['A','A','A','A'],['A','A','A','B'],['A','A','B','A'],['A','B','A','A'],['B','A','A','A'],['A','A','B','B'],['A','B','A','B'],['A','B','B','A'],['A','A','B','C'],['A','B','A','C'],['A','B','C','A'],['B','A','A','C'],['B','A','C','A'],['B','C','A','A'],['A','B','C','D'] base_lm_hidden_dim=100 reasoner_hidden_dim=100 interpreter_hidden_dim=100 share_lm_head=True seed=7,8
+
+
+
+// rn viewing performance on 32 dim with shared lm head weights. Potentially this could be all the negative transfer/most of it. It wasn't. But shokingly there is so much less negative transfer that this setting is doing better than the baseline of just a 32 dim gru lm! 

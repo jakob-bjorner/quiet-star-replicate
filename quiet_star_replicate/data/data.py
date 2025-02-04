@@ -4,12 +4,12 @@ import os
 
 class CustomTokenizer:
     def __init__(self, data_str):
-        vocab = set(data_str)
-        vocab = sorted(list(vocab))
+        self.vocab = set(data_str)
+        self.vocab = sorted(list(self.vocab))
         self.bos_token = "<bos>"
-        vocab.insert(0, self.bos_token)
+        self.vocab.insert(0, self.bos_token)
         self.bos_token_id = 0
-        self.index_to_char_list = vocab
+        self.index_to_char_list = self.vocab
         self.char_to_index_dict = dict((c, i) for i, c in enumerate(self.index_to_char_list))
     def encode(self, char):
         return self.char_to_index_dict[char]
@@ -45,4 +45,6 @@ def get_shakespeare_collate_fn(tokenizer):
             input_ids.append([tokenizer.bos_token_id] + tokenizer.tokenize(example))
         return torch.tensor(input_ids)
     return shakespeare_collate_fn
+
+
 
